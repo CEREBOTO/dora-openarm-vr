@@ -1,0 +1,1 @@
+{"timestamp":"2026-05-26T09:06:50.611548Z","level":"INFO","fields":{"message":"","name":"MeterProvider.GlobalSet","message":"Global meter provider is set. Meters can now be created using global::meter() or global::meter_with_scope()."},"target":"opentelemetry"}

@@ -1,0 +1,23 @@
+Traceback (most recent call last):
+  File "/home/zjj/Desktop/dora-openarm-vr/.venv/bin/dora-openarm-ik", line 10, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/home/zjj/Desktop/dora-openarm-vr/.venv/lib/python3.14/site-packages/dora_openarm_ik/ik.py", line 119, in main
+    _run(args)
+    ~~~~^^^^^^
+  File "/home/zjj/Desktop/dora-openarm-vr/.venv/lib/python3.14/site-packages/dora_openarm_ik/ik.py", line 60, in _run
+    kin = Kinematics(setup_from_args(args), ik_params_from_args(args))
+                     ~~~~~~~~~~~~~~~^^^^^^
+  File "/home/zjj/Desktop/dora-openarm-vr/.venv/lib/python3.14/site-packages/openarm_control/config.py", line 187, in setup_from_args
+    return ArmSetup.from_args(
+           ~~~~~~~~~~~~~~~~~~^
+        xml=args.xml,
+        ^^^^^^^^^^^^^
+    ...<5 lines>...
+        keyframe=args.keyframe,
+        ^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/zjj/Desktop/dora-openarm-vr/.venv/lib/python3.14/site-packages/openarm_control/config.py", line 90, in from_args
+    model = mujoco.MjModel.from_xml_path(xml)
+ValueError: ParseXML: Error opening file 'models/openarm_v10_bimanual.xml'

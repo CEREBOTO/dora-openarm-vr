@@ -1,0 +1,29 @@
+<mujoco model="openarm_cell_v1">
+  <compiler angle="radian" eulerseq="xyz"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <global azimuth="160" elevation="-10"/>
+  </visual>
+
+  <asset>
+    <texture name="groundplane" type="2d" builtin="checker" mark="edge"
+             rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3"
+             markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+    <model name="bimanual" file="openarm_v1_bimanual.xml"/>
+  </asset>
+
+  <worldbody>
+    <light name="ceiling" pos="1.5 0 2.5" dir="-0.5 0 -1" diffuse="0.8 0.8 0.8" specular="0.2 0.2 0.2"/>
+    <geom name="floor" type="plane" pos="0 0 0" size="3 3 0.05" material="groundplane"/>
+    <body name="lifter_base" pos="0.15 0 0">
+      <geom name="lifter_base_vis" type="box" pos="0 0 0.01" size="0.25 0.35 0.015" rgba="0.55 0.55 0.6 1" group="1"/>
+      <body name="openarm_lifter_link" pos="0 0 1.045">
+        <geom name="lifter_link_vis" type="cylinder" size="0.08 0.25" rgba="0.5 0.5 0.55 1" group="1"/>
+        <attach model="bimanual" prefix=""/>
+      </body>
+    </body>
+  </worldbody>
+
+</mujoco>

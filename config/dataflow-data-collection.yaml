@@ -14,7 +14,7 @@
 
 nodes:
   - id: ui
-    build: pip install git+https://github.com/enactic/dora-openarm-data-collection-ui
+    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-openarm-data-collection-ui
     path: dora-openarm-data-collection-ui
     env:
       METADATA_FILE: "test_metadata.yaml"
@@ -30,7 +30,7 @@ nodes:
       - command
 
   - id: quittable-tick-leader
-    build: pip install git+https://github.com/enactic/dora-openarm-quitter
+    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-openarm-quitter
     path: dora-openarm-quitter
     inputs:
       command: ui/command
@@ -39,7 +39,7 @@ nodes:
       - tick
 
   - id: quittable-tick-camera
-    build: pip install git+https://github.com/enactic/dora-openarm-quitter
+    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-openarm-quitter
     path: dora-openarm-quitter
     inputs:
       command: ui/command
@@ -48,7 +48,7 @@ nodes:
       - tick
 
   - id: udp-receiver
-    build: pip install -e ..
+    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install -e ..
     path: dora-openarm-quest-receiver
     args: "--host 0.0.0.0 --port 5006"
     inputs:
@@ -64,7 +64,7 @@ nodes:
       - status
 
   - id: ik
-    build: pip install git+https://github.com/enactic/dora-openarm-kinematics
+    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-openarm-kinematics
     path: dora-openarm-ik
     args: "--mode bimanual --max-iters 10 --dt 0.1 --damping 0.1 --posture-cost 0.01 --lm-damping 0.01"
     inputs:
@@ -80,7 +80,7 @@ nodes:
 
   # ── MuJoCo viewer  ──
   - id: mujoco-viewer
-    build: pip install git+https://github.com/enactic/dora-openarm-mujoco
+    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-openarm-mujoco
     path: dora-openarm-mujoco
     args: "--keyframe home --viewer --debug-frames"
     inputs:
@@ -93,7 +93,7 @@ nodes:
       - status
 
   - id: follower-right
-    build: pip install git+https://github.com/enactic/dora-openarm
+    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-openarm
     path: dora-openarm
     # args: "--side right --align-trigger gripper --config ../../openarm_driver/config/openarm_cell_higher_pd.yaml"
     args: "--side right --align-trigger gripper"
@@ -106,7 +106,7 @@ nodes:
       - status
 
   - id: follower-left
-    build: pip install git+https://github.com/enactic/dora-openarm
+    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-openarm
     path: dora-openarm
     # args: "--side left --align-trigger gripper --config ../../openarm_driver/config/openarm_cell_higher_pd.yaml"
     args: "--side left --align-trigger gripper"
@@ -118,7 +118,7 @@ nodes:
       - status
 
   - id: lifter
-    build: pip install git+https://github.com/enactic/dora-openarm-cell-lifter
+    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-openarm-cell-lifter
     path: dora-openarm-cell-lifter
     inputs:
       joystick_y: udp-receiver/joystick_y
@@ -127,7 +127,7 @@ nodes:
       - elevation_action
 
   - id: camera-wrist-right
-    build: pip install opencv-video-capture
+    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install opencv-video-capture
     path: opencv-video-capture
     env:
       CAPTURE_PATH: "/dev/camera_wrist_right"
@@ -141,7 +141,7 @@ nodes:
       - image
 
   - id: camera-wrist-left
-    build: pip install opencv-video-capture
+    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install opencv-video-capture
     path: opencv-video-capture
     env:
       CAPTURE_PATH: "/dev/camera_wrist_left"
@@ -155,7 +155,7 @@ nodes:
       - image
 
   - id: camera-head-stereo
-    build: pip install opencv-video-capture
+    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install opencv-video-capture
     path: opencv-video-capture
     env:
       CAPTURE_PATH: "/dev/camera_head_stereo"
@@ -168,7 +168,7 @@ nodes:
       - image
 
   - id: camera-head-stereo-splitter
-    build: pip install git+https://github.com/enactic/dora-opencv-image-splitter
+    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-opencv-image-splitter
     path: dora-opencv-image-splitter
     inputs:
       tick: quittable-tick-camera/tick
@@ -184,7 +184,7 @@ nodes:
       - image_1
 
   - id: camera-ceiling
-    build: pip install opencv-video-capture
+    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install opencv-video-capture
     path: opencv-video-capture
     env:
       CAPTURE_PATH: "/dev/camera_ceiling"
@@ -198,7 +198,7 @@ nodes:
       - image
 
   - id: recorder
-    build: pip install git+https://github.com/enactic/dora-openarm-dataset-recorder
+    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-openarm-dataset-recorder
     path: dora-openarm-dataset-recorder
     env:
       METADATA_FILE: "test_metadata.yaml"

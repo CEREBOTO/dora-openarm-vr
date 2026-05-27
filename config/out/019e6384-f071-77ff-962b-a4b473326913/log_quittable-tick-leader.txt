@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/home/zjj/Desktop/dora-openarm-vr/.venv/bin/dora-openarm-quitter", line 10, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/home/zjj/Desktop/dora-openarm-vr/.venv/lib/python3.14/site-packages/dora_openarm_quitter/main.py", line 22, in main
+    node = dora.Node()
+RuntimeError: Could not initiate node from environment variable. For dynamic node, please add a node id in the initialization function.
+
+Caused by:
+   0: failed to init event stream
+   1: subscribe failed: Node mujoco-viewer exited before initializing dora. For more information, run `dora logs 019e6384-f071-77ff-962b-a4b473326913 mujoco-viewer`.
+
+Location:
+    apis/rust/node/src/event_stream/mod.rs:211:17
