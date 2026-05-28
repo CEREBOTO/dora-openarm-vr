@@ -1,0 +1,7 @@
+[model] Loading scene: /home/zjj/Desktop/dora-openarm-vr/config/cell_v1.xml
+[model] Collision (Contact) detection is DISABLED by default.
+{"timestamp":"2026-05-27T08:46:06.315464Z","level":"WARN","fields":{"message":"Ignoring output `arm_right_observation` not in node's output list."},"target":"dora_node_api::node"}
+{"timestamp":"2026-05-27T08:46:06.316771Z","level":"WARN","fields":{"message":"Ignoring output `arm_left_observation` not in node's output list."},"target":"dora_node_api::node"}
+/home/zjj/Desktop/dora-openarm-vr/.venv/lib/python3.14/site-packages/glfw/__init__.py:917: GLFWError: (65548) b'Wayland: The platform does not provide the window position'
+  warnings.warn(message, GLFWError)
+[dora] Event loop started.

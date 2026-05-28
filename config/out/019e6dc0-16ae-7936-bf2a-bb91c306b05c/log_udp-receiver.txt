@@ -1,0 +1,2 @@
+[receiver] Listening on UDP 0.0.0.0:5006
+[receiver] validity: OK → STALE (L=STALE, R=OK)

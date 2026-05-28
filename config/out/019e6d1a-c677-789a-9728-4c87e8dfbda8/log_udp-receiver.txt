@@ -1,0 +1,3 @@
+[receiver] Listening on UDP 0.0.0.0:5006
+{"timestamp":"2026-05-28T05:42:13.152133Z","level":"INFO","fields":{"message":"","name":"MeterProvider.GlobalSet","message":"Global meter provider is set. Meters can now be created using global::meter() or global::meter_with_scope()."},"target":"opentelemetry"}
+[receiver] validity: OK → STALE (L=STALE, R=STALE)
