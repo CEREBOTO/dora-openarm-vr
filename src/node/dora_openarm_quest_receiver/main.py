@@ -161,15 +161,15 @@ def _run(args: argparse.Namespace) -> None:
 
         pose_right_raw, pose_left_raw = processor.process(msg)
 
-        if v_right == VALID_INVALID:
-            if prev_v_right != VALID_INVALID:
+        if v_right in (VALID_INVALID, VALID_STALE):
+            if prev_v_right not in (VALID_INVALID, VALID_STALE):
                 smoother_right.reset()
             pose_right = None
         else:
             pose_right = smoother_right.smooth(now, pose_right_raw)
 
-        if v_left == VALID_INVALID:
-            if prev_v_left != VALID_INVALID:
+        if v_left in (VALID_INVALID, VALID_STALE):
+            if prev_v_left not in (VALID_INVALID, VALID_STALE):
                 smoother_left.reset()
             pose_left = None
         else:
