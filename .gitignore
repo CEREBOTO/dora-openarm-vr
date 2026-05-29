@@ -15,5 +15,4 @@ __pycache__/
 
 .vscode/
 
-# 忽略 config 下的 out 文件夹
 config/out/
