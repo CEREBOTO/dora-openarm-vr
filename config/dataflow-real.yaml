@@ -17,9 +17,10 @@
 
 nodes:
   - id: quittable-tick-leader
-    path: dora-openarm-quitter
+    path: dora-openarm-quitter-local
     inputs:
       tick: dora/timer/millis/20
+      command: udp-receiver/button_b
     outputs:
       - tick
 

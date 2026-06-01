@@ -16,3 +16,5 @@ __pycache__/
 .vscode/
 
 config/out/
+config/dataflow-mujoco-data-collection.yaml
+config/dataflow-data-collection.yaml

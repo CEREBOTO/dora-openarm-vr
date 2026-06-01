@@ -14,7 +14,6 @@
 
 nodes:
   - id: ui
-    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-openarm-data-collection-ui
     path: dora-openarm-data-collection-ui
     env:
       METADATA_FILE: "test_metadata.yaml"
@@ -29,14 +28,12 @@ nodes:
     outputs:
       - command
   - id: quittable-tick-leader
-    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-openarm-quitter.git
     path: dora-openarm-quitter
     inputs:
       tick: dora/timer/millis/2
     outputs:
       - tick
   - id: udp-receiver
-/home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install -e ..
     path: dora-openarm-quest-receiver
     args: "--host 0.0.0.0 --port 5006"
     inputs:
@@ -51,7 +48,6 @@ nodes:
       - button_b
       - status
   - id: ik
-    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-openarm-kinematics
     path: dora-openarm-ik
     args: "--mode bimanual --max-iters 10 --dt 0.1 --damping 0.1 --posture-cost 0.01 --lm-damping 0.01"
     inputs:
@@ -66,7 +62,6 @@ nodes:
       - status
   # ── MuJoCo viewer (replaces follower-right, follower-left, and all cameras) ──
   - id: mujoco-collect
-    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-openarm-mujoco
     path: dora-openarm-mujoco
     # can swap xml with --xml path/to/your/xml/file
     args: "--keyframe home --enable-collision --ctrl --render --viewer "
@@ -88,7 +83,6 @@ nodes:
       - camera_head_right
       - camera_ceiling          # replaces camera-ceiling/image
   - id: recorder
-    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-openarm-dataset-recorder
     path: dora-openarm-dataset-recorder
     env:
       METADATA_FILE: "test_metadata.yaml"

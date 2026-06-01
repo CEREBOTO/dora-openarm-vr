@@ -28,6 +28,7 @@ dependencies = [
 
 [project.scripts]
 dora-openarm-quest-receiver = "node.dora_openarm_quest_receiver.main:main"
+dora-openarm-quitter-local = "local_dora_openarm_quitter.main:main"
 
 [build-system]
 requires = ["setuptools>=64", "wheel"]
