@@ -2,13 +2,14 @@ Metadata-Version: 2.4
 Name: openarm-vr-teleop
 Version: 0.1.0
 Summary: Shared utilities and node implementations for VR teleoperation
-Requires-Python: >=3.11
+Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: dora-rs==0.5.0
 Requires-Dist: dora-rs-cli==0.5.0
 Requires-Dist: numpy>=2.4.4
 Requires-Dist: pyarrow>=23.0.1
+Requires-Dist: pyserial>=3.5
 Requires-Dist: scipy>=1.17.1
 Dynamic: license-file
 

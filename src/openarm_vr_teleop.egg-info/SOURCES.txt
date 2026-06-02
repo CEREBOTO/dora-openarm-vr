@@ -9,6 +9,14 @@ src/local_openarm_driver/base_safety.py
 src/local_openarm_driver/config.py
 src/local_openarm_driver/driver.py
 src/local_openarm_driver/safety.py
+src/node/dora_openarm_chassis_controller/__init__.py
+src/node/dora_openarm_chassis_controller/main.py
+src/node/dora_openarm_chassis_receiver/__init__.py
+src/node/dora_openarm_chassis_receiver/main.py
+src/node/dora_openarm_lift_controller/__init__.py
+src/node/dora_openarm_lift_controller/main.py
+src/node/dora_openarm_lift_receiver/__init__.py
+src/node/dora_openarm_lift_receiver/main.py
 src/node/dora_openarm_quest_receiver/main.py
 src/openarm_vr_teleop.egg-info/PKG-INFO
 src/openarm_vr_teleop.egg-info/SOURCES.txt

@@ -17,7 +17,10 @@
 import argparse
 import dataclasses
 import dora
-import openarm_driver
+try:
+    import openarm_driver
+except ImportError:
+    import local_openarm_driver as openarm_driver
 import os
 import pathlib
 import pyarrow as pa

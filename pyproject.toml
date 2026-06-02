@@ -17,18 +17,24 @@ name = "openarm-vr-teleop"
 version = "0.1.0"
 description = "Shared utilities and node implementations for VR teleoperation"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "dora-rs==0.5.0",
     "dora-rs-cli==0.5.0",
     "numpy>=2.4.4",
     "pyarrow>=23.0.1",
+    "pyserial>=3.5",
     "scipy>=1.17.1",
 ]
 
 [project.scripts]
 dora-openarm-quest-receiver = "node.dora_openarm_quest_receiver.main:main"
 dora-openarm-quitter-local = "local_dora_openarm_quitter.main:main"
+dora-openarm-chassis-receiver = "node.dora_openarm_chassis_receiver.main:main"
+dora-openarm-chassis-controller = "node.dora_openarm_chassis_controller.main:main"
+dora-openarm-lift-receiver = "node.dora_openarm_lift_receiver.main:main"
+dora-openarm-lift-controller = "node.dora_openarm_lift_controller.main:main"
+dora-openarm = "local_dora_openarm.main:main"
 
 [build-system]
 requires = ["setuptools>=64", "wheel"]
