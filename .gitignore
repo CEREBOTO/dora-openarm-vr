@@ -18,13 +18,8 @@ __pycache__/
 config/out/
 config/dataflow-mujoco-data-collection.yaml
 config/dataflow-data-collection.yaml
-config/dataflow-chassis.yaml
-config/dataflow-lift.yaml
 
-src/node/dora_openarm_chassis_controller/
-src/node/dora_openarm_chassis_receiver/
-src/node/dora_openarm_lift_controller/
-src/node/dora_openarm_lift_receiver/
+
 src/openarm_vr_teleop.egg-info/
 
 config/test_data/

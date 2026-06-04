@@ -1,0 +1,44 @@
+# Copyright 2026 Enactic, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ── OpenArm Chassis Teleoperation with Quest VR ──
+# Usage:
+#   dora run config/dataflow-chassis.yaml
+#
+# Pure Python — no ROS 2 dependency.  Writes CtrlCmd CAN frames directly to can0.
+# Make sure can0 is up:  sudo ip link set can0 type can bitrate 500000 && sudo ip link set up can0
+#
+# Runs independently from dataflow-real.yaml (arms).
+# Both share the same Quest UDP port 5006 via SO_REUSEADDR.
+
+nodes:
+  - id: quest-receiver
+    path: dora-openarm-chassis-receiver
+    args: "--host 0.0.0.0 --port 5006"
+    inputs:
+      tick: dora/timer/millis/20
+    outputs:
+      - left_stick_y
+      - right_stick_x
+      - status
+
+  - id: chassis-controller
+    path: dora-openarm-chassis-controller
+    args: "--max-linear 0.05 --max-angular 25.0 --deadzone 0.05"
+    inputs:
+      tick: dora/timer/millis/20
+      left_stick_y: quest-receiver/left_stick_y
+      right_stick_x: quest-receiver/right_stick_x
+    outputs:
+      - status

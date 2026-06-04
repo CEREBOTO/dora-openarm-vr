@@ -1,0 +1,47 @@
+# Copyright 2026 Enactic, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ── OpenArm Lift Teleoperation with Quest VR ──
+# Usage:
+#   dora run config/dataflow-lift.yaml
+#
+# Hold-to-operate:  Left X button → lift up,  Left Y button → lift down.
+# Release stops the lift.
+#
+# Pure Python — writes text-line serial commands to the Pico lift controller
+# over USB serial (/dev/ttyACM0 @ 115200 baud).
+#
+# Runs independently from dataflow-real.yaml (arms) and dataflow-chassis.yaml.
+# All share the same Quest UDP port 5006 via SO_REUSEADDR.
+
+nodes:
+  - id: quest-receiver
+    path: dora-openarm-lift-receiver
+    args: "--host 0.0.0.0 --port 5006"
+    inputs:
+      tick: dora/timer/millis/20
+    outputs:
+      - button_x
+      - button_y
+      - status
+
+  - id: lift-controller
+    path: dora-openarm-lift-controller
+    args: "--port /dev/ttyACM0 --baud 115200"
+    inputs:
+      tick: dora/timer/millis/20
+      button_x: quest-receiver/button_x
+      button_y: quest-receiver/button_y
+    outputs:
+      - status
