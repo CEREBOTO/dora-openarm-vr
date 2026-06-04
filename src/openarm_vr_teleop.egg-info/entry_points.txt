@@ -1,4 +1,5 @@
 [console_scripts]
+dora-openarm = local_dora_openarm.main:main
 dora-openarm-chassis-controller = node.dora_openarm_chassis_controller.main:main
 dora-openarm-chassis-receiver = node.dora_openarm_chassis_receiver.main:main
 dora-openarm-lift-controller = node.dora_openarm_lift_controller.main:main
