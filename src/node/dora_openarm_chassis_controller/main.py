@@ -151,7 +151,10 @@ def _run(args: argparse.Namespace) -> None:
 
             payload = _encode_ctrl_cmd(gear, x_lin, 0.0, z_ang)
             frame = struct.pack(_CAN_FRAME_FMT, _CAN_ID_CTRL_CMD, 8, payload)
-            can_sock.send(frame)
+            try:
+                can_sock.send(frame)
+            except OSError:
+                pass
 
     finally:
         # Send stop frame (park, zero velocity)

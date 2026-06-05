@@ -1,0 +1,129 @@
+# Copyright 2026 Enactic, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ── OpenArm Unified Teleoperation with Quest VR ──
+# Usage:
+#   ./config/launch.sh          # auto-detect hardware, skip missing subsystems
+#   dora run config/dataflow-unified.yaml   # run all nodes (requires full hardware)
+#
+# Hardware detection rules (enforced by launch.sh):
+#   - arm-* (全部arm节点):     2 个或 3 个 CAN 接口 → 前两个重命名为 can0/can1
+#   - chassis-*:               1 个或 3 个 CAN 接口 → 最后一个重命名为 can2
+#   - lift-*:                  /dev/ttyACM0 存在
+#
+# Arm followers read can0/can1 from config.yaml, so renaming is REQUIRED.
+# Chassis controller uses --can-if can2 (already set in YAML below).
+#
+# A single UDP receiver (quest-receiver) binds port 5006 and feeds
+# all subsystems, avoiding SO_REUSEADDR UDP packet-loss between receivers.
+
+nodes:
+  # ================================================================
+  #  Shared — Quest VR 数据接收 (始终启动，所有子系统依赖)
+  # ================================================================
+
+  - id: quest-tick-leader
+    build: uv pip install -e ..
+    path: dora-openarm-quitter-local
+    inputs:
+      tick: dora/timer/millis/20
+      command: quest-receiver/button_b
+    outputs:
+      - tick
+
+  - id: quest-receiver
+    build: uv pip install -e ..
+    path: dora-openarm-quest-receiver
+    args: "--host 0.0.0.0 --port 5006"
+    inputs:
+      tick: quest-tick-leader/tick
+    outputs:
+      - pose_right
+      - trigger_right
+      - pose_left
+      - trigger_left
+      - joystick_y
+      - right_stick_x
+      - button_a
+      - button_b
+      - button_x
+      - button_y
+      - status
+
+  # ================================================================
+  #  Arms — 需要 can0 且 can1 同时 UP
+  # ================================================================
+
+  - id: arm-ik
+    build: uv pip install git+https://github.com/enactic/dora-openarm-kinematics
+    path: dora-openarm-ik
+    args: "--mode bimanual --max-iters 10 --dt 0.1 --damping 0.1 --posture-cost 0.01 --lm-damping 0.01"
+    inputs:
+      tick: quest-tick-leader/tick
+      target_right: quest-receiver/pose_right
+      target_left:  quest-receiver/pose_left
+      trigger_right: quest-receiver/trigger_right
+      trigger_left:  quest-receiver/trigger_left
+    outputs:
+      - position_left
+      - position_right
+      - status
+
+  - id: arm-follower-right
+    path: dora-openarm
+    args: "--side right"
+    inputs:
+      request_state: arm-ik/position_right
+      move_position: arm-ik/position_right
+    outputs:
+      - state
+      - status
+
+  - id: arm-follower-left
+    path: dora-openarm
+    args: "--side left"
+    inputs:
+      request_state: arm-ik/position_left
+      move_position: arm-ik/position_left
+    outputs:
+      - state
+      - status
+
+  # ================================================================
+  #  Chassis — 需要 can2 UP, 数据来自 quest-receiver
+  # ================================================================
+
+  - id: chassis-controller
+    path: dora-openarm-chassis-controller
+    args: "--can-if can2 --max-linear 0.05 --max-angular 25.0 --deadzone 0.05"
+    inputs:
+      tick: dora/timer/millis/20
+      left_stick_y: quest-receiver/joystick_y
+      right_stick_x: quest-receiver/right_stick_x
+    outputs:
+      - status
+
+  # ================================================================
+  #  Lift — 需要 /dev/ttyACM0 存在, 数据来自 quest-receiver
+  # ================================================================
+
+  - id: lift-controller
+    path: dora-openarm-lift-controller
+    args: "--port /dev/ttyACM0 --baud 115200"
+    inputs:
+      tick: dora/timer/millis/20
+      button_x: quest-receiver/button_x
+      button_y: quest-receiver/button_y
+    outputs:
+      - status

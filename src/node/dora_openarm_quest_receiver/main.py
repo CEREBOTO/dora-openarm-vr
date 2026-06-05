@@ -191,10 +191,16 @@ def _run(args: argparse.Namespace) -> None:
             node.send_output("trigger_left",  pa.array([msg["lt"]], type=pa.float32()), ts)
         if "lsy" in msg:
             node.send_output("joystick_y",    pa.array([float(msg["lsy"])], type=pa.float32()), ts)
+        if "rsx" in msg:
+            node.send_output("right_stick_x", pa.array([float(msg["rsx"])], type=pa.float32()), ts)
         if "a" in msg:
             node.send_output("button_a", pa.array([bool(msg["a"])], type=pa.bool_()), ts)
         if "b" in msg:
             node.send_output("button_b", pa.array([bool(msg["b"])], type=pa.bool_()), ts)
+        if "x" in msg:
+            node.send_output("button_x", pa.array([bool(msg["x"])], type=pa.bool_()), ts)
+        if "y" in msg:
+            node.send_output("button_y", pa.array([bool(msg["y"])], type=pa.bool_()), ts)
 
     receiver.close()
 
