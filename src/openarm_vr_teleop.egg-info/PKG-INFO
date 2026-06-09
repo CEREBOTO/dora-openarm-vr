@@ -7,7 +7,10 @@ Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: dora-rs==0.5.0
 Requires-Dist: dora-rs-cli==0.5.0
+Requires-Dist: mink>=1.1.0
+Requires-Dist: mujoco>=3.8.0
 Requires-Dist: numpy>=2.4.4
+Requires-Dist: openarm-control
 Requires-Dist: pyarrow>=23.0.1
 Requires-Dist: pyserial>=3.5
 Requires-Dist: scipy>=1.17.1

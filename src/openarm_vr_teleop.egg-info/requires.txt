@@ -1,6 +1,9 @@
 dora-rs==0.5.0
 dora-rs-cli==0.5.0
+mink>=1.1.0
+mujoco>=3.8.0
 numpy>=2.4.4
+openarm-control
 pyarrow>=23.0.1
 pyserial>=3.5
 scipy>=1.17.1

@@ -21,11 +21,17 @@ requires-python = ">=3.11"
 dependencies = [
     "dora-rs==0.5.0",
     "dora-rs-cli==0.5.0",
+    "mink>=1.1.0",
+    "mujoco>=3.8.0",
     "numpy>=2.4.4",
+    "openarm-control",
     "pyarrow>=23.0.1",
     "pyserial>=3.5",
     "scipy>=1.17.1",
 ]
+
+[tool.uv.sources]
+openarm-control = { git = "https://github.com/enactic/openarm_control" }
 
 [project.scripts]
 dora-openarm-quest-receiver = "node.dora_openarm_quest_receiver.main:main"
@@ -35,6 +41,7 @@ dora-openarm-chassis-controller = "node.dora_openarm_chassis_controller.main:mai
 dora-openarm-lift-receiver = "node.dora_openarm_lift_receiver.main:main"
 dora-openarm-lift-controller = "node.dora_openarm_lift_controller.main:main"
 dora-openarm = "local_dora_openarm.main:main"
+dora-openarm-ik = "node.dora_openarm_ik:main"
 
 [build-system]
 requires = ["setuptools>=64", "wheel"]

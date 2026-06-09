@@ -64,7 +64,7 @@ nodes:
       - status
 
   - id: ik
-    build: /home/zjj/Desktop/dora-openarm-vr/.venv/bin/pip install git+https://github.com/enactic/dora-openarm-kinematics
+    build: uv pip install -e ..
     path: dora-openarm-ik
     args: "--mode bimanual --max-iters 10 --dt 0.1 --damping 0.1 --posture-cost 0.01 --lm-damping 0.01"
     inputs:

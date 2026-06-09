@@ -14,7 +14,7 @@
 
 nodes:
   - id: quittable-tick-leader
-    path: dora-openarm-quitter
+    path: dora-openarm-quitter-local
     inputs:
       tick: dora/timer/millis/2
     outputs:
@@ -34,6 +34,7 @@ nodes:
       - button_b
       - status
   - id: ik
+    build: uv pip install -e ..
     path: dora-openarm-ik
     args: "--mode bimanual --max-iters 10 --dt 0.1 --damping 0.1 --posture-cost 0.01 --lm-damping 0.01"
     inputs:

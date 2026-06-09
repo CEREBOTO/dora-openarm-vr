@@ -2,6 +2,7 @@
 dora-openarm = local_dora_openarm.main:main
 dora-openarm-chassis-controller = node.dora_openarm_chassis_controller.main:main
 dora-openarm-chassis-receiver = node.dora_openarm_chassis_receiver.main:main
+dora-openarm-ik = node.dora_openarm_ik:main
 dora-openarm-lift-controller = node.dora_openarm_lift_controller.main:main
 dora-openarm-lift-receiver = node.dora_openarm_lift_receiver.main:main
 dora-openarm-quest-receiver = node.dora_openarm_quest_receiver.main:main
