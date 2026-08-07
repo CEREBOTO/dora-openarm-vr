@@ -58,17 +58,58 @@ def _parse_height(line: str) -> float | None:
     return None
 
 
+def _open_serial(
+    port: str,
+    baud: int,
+    retries: int = 5,
+    retry_delay: float = 0.5,
+) -> serial.Serial:
+    """Open the Pico serial port, tolerating USB reset and DTR quirks."""
+    last_error: OSError | serial.SerialException | None = None
+
+    for attempt in range(1, retries + 1):
+        ser: serial.Serial | None = None
+        try:
+            ser = serial.Serial(port, baud, timeout=0.2)
+
+            # Some Pico USB CDC firmware does not implement modem-control
+            # requests. Failure to change DTR/RTS does not make serial I/O
+            # unusable, so continue with the state selected during open.
+            try:
+                ser.setDTR(False)
+                ser.setRTS(False)
+            except (AttributeError, OSError, serial.SerialException) as exc:
+                print(f"[lift-controller] DTR/RTS unavailable: {exc}")
+
+            # Opening or toggling DTR can briefly reset/re-enumerate the Pico.
+            time.sleep(0.25)
+            ser.reset_input_buffer()
+            ser.reset_output_buffer()
+            return ser
+        except (OSError, serial.SerialException) as exc:
+            last_error = exc
+            if ser is not None and ser.is_open:
+                ser.close()
+            if attempt == retries:
+                break
+            print(
+                f"[lift-controller] Serial open failed "
+                f"({attempt}/{retries}): {exc}; retrying ..."
+            )
+            time.sleep(retry_delay)
+
+    raise serial.SerialException(
+        f"Could not open {port} after {retries} attempts: {last_error}"
+    )
+
+
 def _run(args: argparse.Namespace) -> None:
-    ser = serial.Serial(args.port, args.baud, timeout=0.2)
-    # Prevent DTR/RTS from resetting the Pico on open
-    try:
-        ser.setDTR(False)
-        ser.setRTS(False)
-    except (AttributeError, serial.SerialException):
-        pass
-    time.sleep(0.15)
-    ser.reset_input_buffer()
-    ser.reset_output_buffer()
+    ser = _open_serial(
+        args.port,
+        args.baud,
+        retries=args.open_retries,
+        retry_delay=args.retry_delay,
+    )
     print(f"[lift-controller] Opened {args.port} @ {args.baud}")
 
     node = dora.Node()
@@ -144,7 +185,10 @@ def _run(args: argparse.Namespace) -> None:
                 last_send_time = now
 
     finally:
-        _send(ser, "stop")
+        try:
+            _send(ser, "stop")
+        except (OSError, serial.SerialException):
+            pass
         ser.close()
         print("[lift-controller] Serial closed")
 
@@ -159,6 +203,10 @@ def main() -> None:
                         help="Baud rate")
     parser.add_argument("--poll-interval", type=float, default=0.5,
                         help="Interval in seconds between get height polls")
+    parser.add_argument("--open-retries", type=int, default=5,
+                        help="Number of serial open attempts")
+    parser.add_argument("--retry-delay", type=float, default=0.5,
+                        help="Delay between serial open attempts in seconds")
     args = parser.parse_args()
     _run(args)
 

@@ -50,7 +50,7 @@ nodes:
   # ── MuJoCo viewer with OpenArm v1 (official URDF model) ──
   - id: mujoco-viewer
     path: dora-openarm-mujoco
-    args: "--xml /home/zjj/Desktop/dora-openarm-vr/config/cell_v1.xml --keyframe home --viewer --debug-frames"
+    args: "--xml ~ros2_ws/src/dora-openarm-vr/config/cell_v1.xml --keyframe home --viewer --debug-frames"
     inputs:
       position_left:  ik/position_left
       position_right: ik/position_right

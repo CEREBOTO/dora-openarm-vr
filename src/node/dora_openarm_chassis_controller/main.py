@@ -147,7 +147,7 @@ def _run(args: argparse.Namespace) -> None:
             else:
                 gear = _GEAR_FOUR_WHEEL_STEER
                 x_lin = float(np.clip(left_val * max_linear, -max_linear, max_linear))
-                z_ang = float(np.clip(right_val * max_angular, -max_angular, max_angular))
+                z_ang = float(np.clip(-right_val * max_angular, -max_angular, max_angular))
 
             payload = _encode_ctrl_cmd(gear, x_lin, 0.0, z_ang)
             frame = struct.pack(_CAN_FRAME_FMT, _CAN_ID_CTRL_CMD, 8, payload)
@@ -172,7 +172,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Chassis teleop: joysticks → SocketCAN (dora node, no ROS 2)",
     )
-    parser.add_argument("--can-if", default="can0",
+    parser.add_argument("--can-if", default="can2",
                         help="SocketCAN interface name")
     parser.add_argument("--max-linear", type=float, default=0.3,
                         help="Max forward speed (m/s)")

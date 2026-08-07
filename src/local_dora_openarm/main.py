@@ -16,55 +16,126 @@
 
 import argparse
 import dataclasses
+import os
+import pathlib
+import time
+
 import dora
+import numpy as np
+import pyarrow as pa
+
 try:
     import openarm_driver
 except ImportError:
     import local_openarm_driver as openarm_driver
-import os
-import pathlib
-import pyarrow as pa
-import numpy as np
 
 
 @dataclasses.dataclass
 class AlignState:
     """State for alignment."""
 
-    align_target: np.ndarray = None
-    step_limit: float = 0.001
+    align_target: np.ndarray | None = None
+    startup_target: np.ndarray | None = None
+    last_update: float | None = None
+    settled_since: float | None = None
+    last_progress_log: float | None = None
 
 
-def _align(arm, state, new_position, name, threshold, trigger=None):
-    """Safety: Align OpenArm with the position."""
+def _step_towards(
+    current_command: np.ndarray,
+    target: np.ndarray,
+    max_joint_speed: float,
+    dt: float,
+) -> np.ndarray:
+    """Move arm-joint commands toward target without exceeding rad/s."""
+    command = current_command.copy()
+    max_step = max_joint_speed * dt
+    command[:7] += np.clip(
+        target[:7] - current_command[:7],
+        -max_step,
+        max_step,
+    )
+    # Gripper has different units (meters) and is not part of arm alignment.
+    command[-1] = target[-1]
+    return command
+
+
+def _align(
+    arm,
+    state,
+    new_position,
+    name,
+    threshold,
+    max_joint_speed,
+    trigger=None,
+):
+    """Approach the first startup target at a bounded joint speed."""
+    live_target = np.asarray(new_position, dtype=np.float32)
+
     if trigger == "gripper":
         # v1: prismatic finger (slide), range [0, 0.044] m
         # gripping = gripper near 0 (closed position, < 5 mm)
-        gripper_position = new_position[-1]  # Last value is gripper's position
-        is_gripping = gripper_position.as_py() < 0.005
+        is_gripping = live_target[-1] < 0.005
         if not is_gripping:
             return False
 
-    def current_position():
-        return np.array(arm.fetch_position(), dtype=np.float32)
+    current_position = np.array(arm.fetch_position(), dtype=np.float32)
 
     if state.align_target is None:
-        state.align_target = current_position()
+        state.align_target = current_position.copy()
+        state.startup_target = live_target.copy()
+        state.last_update = time.monotonic()
+        state.last_progress_log = state.last_update
+        print(
+            f"[{name}] startup alignment: approaching captured target "
+            f"at {max_joint_speed:.2f} rad/s"
+        )
 
-    def is_aligned(position1, position2):
-        return np.all(np.abs(position1 - position2) < threshold)
+    target = state.startup_target
+    assert target is not None
 
-    # If OpenArm is already aligned, we do nothing.
-    if is_aligned(new_position, current_position()):
+    # Prefer measured motor positions when deciding that alignment is complete.
+    actual_error = float(np.max(np.abs(target[:7] - current_position[:7])))
+    if actual_error <= threshold:
         return True
 
-    diff = new_position - state.align_target
-    step_move = np.clip(diff, -state.step_limit, state.step_limit)
-    state.align_target += step_move
-
+    now = time.monotonic()
+    dt = min(max(now - state.last_update, 0.0), 0.1)
+    state.last_update = now
+    state.align_target = _step_towards(
+        state.align_target,
+        target,
+        max_joint_speed,
+        dt,
+    )
     arm.send_position(state.align_target)
 
-    return is_aligned(new_position, current_position())
+    command_error = float(np.max(np.abs(target[:7] - state.align_target[:7])))
+    if command_error <= threshold:
+        if state.settled_since is None:
+            state.settled_since = now
+        elif now - state.settled_since >= 0.5:
+            # Some adapters report a small persistent position offset even
+            # after the bounded command trajectory has reached its target.
+            print(
+                f"[{name}] startup command settled "
+                f"(measured max error {actual_error:.3f} rad)"
+            )
+            return True
+    else:
+        state.settled_since = None
+
+    if (
+        state.last_progress_log is not None
+        and now - state.last_progress_log >= 1.0
+    ):
+        print(
+            f"[{name}] aligning: command error {command_error:.3f} rad, "
+            f"measured error {actual_error:.3f} rad"
+        )
+        state.last_progress_log = now
+
+    return False
 
 
 def _env_flag(name, default=False):
@@ -97,8 +168,14 @@ def main():
     )
     parser.add_argument(
         "--align-threshold",
-        default=0.1,
-        help="Alignment threshold [rad] (default: 0.1)",
+        default=0.03,
+        help="Startup alignment threshold [rad] (default: 0.03)",
+        type=float,
+    )
+    parser.add_argument(
+        "--align-speed",
+        default=0.3,
+        help="Startup alignment joint speed [rad/s] (default: 0.3)",
         type=float,
     )
     parser.add_argument(
@@ -114,11 +191,17 @@ def main():
         help="Refresh OpenArm on every request to make it more accurate.",
     )
     args = parser.parse_args()
+    if args.align_speed <= 0:
+        parser.error("--align-speed must be greater than zero")
+    if args.align_threshold <= 0:
+        parser.error("--align-threshold must be greater than zero")
+
     node = dora.Node()
     name = f"{args.side}_arm"
     config = openarm_driver.Config(args.config)
     arm = openarm_driver.SingleArmDriver(name, config)
     arm.start()
+    node.send_output("status", pa.array(["aligning"]))
 
     initialized = False
     last_sent = None  # track last position actually sent to hardware
@@ -163,28 +246,22 @@ def main():
                 new_position = value
                 # other_arm_position = None
             if not initialized:
-                if args.align_trigger is not None:
-                    initialized = _align(
-                        arm,
-                        align_state,
-                        new_position,
-                        name,
-                        args.align_threshold,
-                        trigger=args.align_trigger,
-                    )
-                    if initialized:
-                        node.send_output("status", pa.array(["ready"]))
-                    continue
-                else:
-                    # No align trigger: seed last_sent with current motor position.
-                    # Start with a tiny rate limit and gently ramp it up over ~2 seconds
-                    # to avoid any sudden velocity change on startup.
-                    initialized = True
+                initialized = _align(
+                    arm,
+                    align_state,
+                    new_position,
+                    name,
+                    args.align_threshold,
+                    args.align_speed,
+                    trigger=args.align_trigger,
+                )
+                if initialized:
                     init_tick = 0
-                    rate_limit = 0.03  # ≈1.5 rad/s
+                    rate_limit = 0.03
                     last_sent = np.array(arm.fetch_position(), dtype=np.float32)
+                    print(f"[{name}] startup alignment complete; teleoperation ready")
                     node.send_output("status", pa.array(["ready"]))
-                    # fall through to normal tracking below
+                continue
 
             target = np.array(new_position, dtype=np.float32)
 

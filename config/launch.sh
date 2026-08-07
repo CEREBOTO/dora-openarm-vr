@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # ── OpenArm Unified Launch Script ──
-# Auto-detects connected CAN interfaces by *count* and renames them:
-#   1 CAN 接口  → can2 (底盘)
-#   2 CAN 接口  → can0, can1 (双臂)
-#   3 CAN 接口  → can0, can1, can2 (双臂 + 底盘)
+# Auto-detects connected CAN interfaces without renaming them:
+#   1 CAN 接口  → 底盘
+#   2 CAN 接口  → 双臂
+#   3 CAN 接口  → 双臂 + 底盘
 #
-# Arm followers hardcode can0/right_arm and can1/left_arm (config.yaml),
-# so renaming is REQUIRED for arms.  Chassis uses --can-if which we inject.
+# Actual interface names are injected into a runtime arm config and the
+# chassis --can-if argument. This avoids interface-name collisions.
+# The defaults can be overridden with RIGHT_ARM_CAN, LEFT_ARM_CAN,
+# and CHASSIS_CAN when kernel enumeration is not stable.
 #
 # Usage:  ./config/launch.sh
 
@@ -15,113 +17,195 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 UNIFIED_YAML="$SCRIPT_DIR/dataflow-unified.yaml"
-RUNTIME_YAML="/tmp/dataflow-runtime.yaml"
+ARM_CONFIG_SOURCE="$PROJECT_DIR/src/local_openarm_driver/config.yaml"
+RUNTIME_YAML="/tmp/dataflow-runtime-${UID}.yaml"
+RUNTIME_ARM_CONFIG="/tmp/openarm-config-${UID}.yaml"
+if [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -d "$XDG_RUNTIME_DIR" ]; then
+    LOCK_FILE="$XDG_RUNTIME_DIR/openarm-launch.lock"
+else
+    LOCK_FILE="/tmp/openarm-launch-v2-${UID}.lock"
+fi
+DORA_PID=""
+CLEANUP_DONE=false
 
-# ── Phase 0: 检查并安全清理幽灵接口 ──
-# 上次运行我们把硬件重命名为 can0/can1/can2。
-# 设备拔掉后 CAN 接口残留为 DOWN 的"幽灵"，/sys/class/net/$iface/device 不存在。
-# 安全规则：只删除没有硬件背书的接口。
+# ── 单实例锁与清理 ──
 
-for iface in can0 can1 can2; do
-    if ip link show "$iface" &>/dev/null; then
-        if [ ! -e /sys/class/net/"$iface"/device ]; then
-            echo "[launch] 清理幽灵接口: $iface（无硬件设备）"
-            sudo ip link delete "$iface" 2>/dev/null || true
-        fi
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "[launch] 错误: 已有 launch.sh 正在运行，请先停止旧实例"
+    exit 1
+fi
+
+cleanup() {
+    local exit_code=$?
+    local attempts
+
+    # EXIT 与信号可能连续触发，确保清理只执行一次。
+    if $CLEANUP_DONE; then
+        return
     fi
-done
+    CLEANUP_DONE=true
+    trap - EXIT INT TERM
 
-# ── Phase 1: 收集所有 CAN 接口并重命名为临时名字 ──
+    if [ -n "$DORA_PID" ]; then
+        echo "[launch] 正在停止 Dora 节点 ..."
+
+        # 先通知 dora run 优雅停止，让机械臂等节点处理 STOP 事件。
+        kill -INT "$DORA_PID" 2>/dev/null || true
+        for attempts in {1..50}; do
+            if ! pgrep -s "$DORA_PID" >/dev/null 2>&1; then
+                break
+            fi
+            sleep 0.1
+        done
+
+        # Dora 节点可能拥有各自的进程组，但都属于 setsid 创建的 session。
+        if pgrep -s "$DORA_PID" >/dev/null 2>&1; then
+            echo "[launch] 部分节点未退出，发送 TERM ..."
+            pkill -TERM -s "$DORA_PID" 2>/dev/null || true
+            for attempts in {1..20}; do
+                if ! pgrep -s "$DORA_PID" >/dev/null 2>&1; then
+                    break
+                fi
+                sleep 0.1
+            done
+        fi
+
+        if pgrep -s "$DORA_PID" >/dev/null 2>&1; then
+            echo "[launch] 强制清理残留节点 ..."
+            pkill -KILL -s "$DORA_PID" 2>/dev/null || true
+        fi
+
+        wait "$DORA_PID" 2>/dev/null || true
+        DORA_PID=""
+    fi
+
+    rm -f "$RUNTIME_YAML" "$RUNTIME_ARM_CONFIG"
+    flock -u 9 2>/dev/null || true
+    exec 9>&-
+    echo "[launch] 已退出"
+
+    return "$exit_code"
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+# ── Phase 1: 收集 CAN 接口 ──
 
 echo "[launch] 扫描 CAN 接口 ..."
 
-CAN_IFACES=($(ip -o link show type can 2>/dev/null | awk '{print $2}' | sed 's/:$//' || true))
+mapfile -t CAN_IFACES < <(
+    ip -o link show type can 2>/dev/null |
+        awk '{sub(/:$/, "", $2); print $2}' |
+        sort -V
+)
 
-if [ ${#CAN_IFACES[@]} -eq 0 ]; then
-    echo "[launch] 未检测到任何 CAN 接口"
-fi
-
-# 先把所有接口 down 并重命名为临时名字
-TMP_CAN=()
-for idx in "${!CAN_IFACES[@]}"; do
-    iface="${CAN_IFACES[$idx]}"
-    sudo ip link set "$iface" down 2>/dev/null || true
-    tmp_name="tmp_can_$idx"
-    sudo ip link set "$iface" name "$tmp_name" 2>/dev/null || true
-    TMP_CAN+=("$tmp_name")
-done
-
-# ── Phase 2: 按数量决定角色并重命名为目标名称 ──
-
-CAN_COUNT=${#TMP_CAN[@]}
+CAN_COUNT=${#CAN_IFACES[@]}
 HAS_ARMS=false
 HAS_CHASSIS=false
-HAS_CAN0=false
-HAS_CAN1=false
-HAS_CAN2=false
+RIGHT_CAN=""
+LEFT_CAN=""
+CHASSIS_CAN_ACTUAL=""
 
 case $CAN_COUNT in
+    0)
+        echo "[launch] 未检测到任何 CAN 接口"
+        ;;
     1)
-        echo "[launch]   ${TMP_CAN[0]} → can2"
-        sudo ip link set "${TMP_CAN[0]}" name can2 2>/dev/null || true
+        CHASSIS_CAN_ACTUAL="${CHASSIS_CAN:-${CAN_IFACES[0]}}"
         HAS_CHASSIS=true
-        HAS_CAN2=true
-        echo "[launch] 检测到 1 个 CAN 接口 → 底盘 (can2)"
+        echo "[launch] 检测到 1 个 CAN 接口 → 底盘 ($CHASSIS_CAN_ACTUAL)"
         ;;
     2)
-        echo "[launch]   ${TMP_CAN[0]} → can0"
-        sudo ip link set "${TMP_CAN[0]}" name can0 2>/dev/null || true
-        echo "[launch]   ${TMP_CAN[1]} → can1"
-        sudo ip link set "${TMP_CAN[1]}" name can1 2>/dev/null || true
+        RIGHT_CAN="${RIGHT_ARM_CAN:-${CAN_IFACES[0]}}"
+        LEFT_CAN="${LEFT_ARM_CAN:-${CAN_IFACES[1]}}"
         HAS_ARMS=true
-        HAS_CAN0=true
-        HAS_CAN1=true
-        echo "[launch] 检测到 2 个 CAN 接口 → 双臂 (can0 / can1)"
+        echo "[launch] 检测到 2 个 CAN 接口 → 双臂 ($RIGHT_CAN / $LEFT_CAN)"
         ;;
     3)
-        echo "[launch]   ${TMP_CAN[0]} → can0"
-        sudo ip link set "${TMP_CAN[0]}" name can0 2>/dev/null || true
-        echo "[launch]   ${TMP_CAN[1]} → can1"
-        sudo ip link set "${TMP_CAN[1]}" name can1 2>/dev/null || true
-        echo "[launch]   ${TMP_CAN[2]} → can2"
-        sudo ip link set "${TMP_CAN[2]}" name can2 2>/dev/null || true
+        RIGHT_CAN="${RIGHT_ARM_CAN:-${CAN_IFACES[0]}}"
+        LEFT_CAN="${LEFT_ARM_CAN:-${CAN_IFACES[1]}}"
+        CHASSIS_CAN_ACTUAL="${CHASSIS_CAN:-${CAN_IFACES[2]}}"
         HAS_ARMS=true
         HAS_CHASSIS=true
-        HAS_CAN0=true
-        HAS_CAN1=true
-        HAS_CAN2=true
-        echo "[launch] 检测到 3 个 CAN 接口 → 双臂 (can0 / can1) + 底盘 (can2)"
+        echo "[launch] 检测到 3 个 CAN 接口 → 双臂 ($RIGHT_CAN / $LEFT_CAN) + 底盘 ($CHASSIS_CAN_ACTUAL)"
+        ;;
+    *)
+        echo "[launch] 错误: 检测到 $CAN_COUNT 个 CAN 接口，无法自动分配角色"
+        echo "[launch] 接口: ${CAN_IFACES[*]}"
+        exit 1
         ;;
 esac
 
 echo ""
 
-# ── Phase 3: 配置 CAN 接口并 UP ──
+# ── Phase 2: 校验并配置 CAN 接口 ──
+
+validate_can() {
+    local iface="$1"
+    local role="$2"
+
+    if ! ip link show "$iface" &>/dev/null; then
+        echo "[launch] 错误: $role 指定的接口 $iface 不存在"
+        exit 1
+    fi
+}
+
+if $HAS_ARMS; then
+    validate_can "$RIGHT_CAN" "右臂"
+    validate_can "$LEFT_CAN" "左臂"
+    if [ "$RIGHT_CAN" = "$LEFT_CAN" ]; then
+        echo "[launch] 错误: 左右臂不能共用接口 $RIGHT_CAN"
+        exit 1
+    fi
+fi
+
+if $HAS_CHASSIS; then
+    validate_can "$CHASSIS_CAN_ACTUAL" "底盘"
+    if $HAS_ARMS && { [ "$CHASSIS_CAN_ACTUAL" = "$RIGHT_CAN" ] || [ "$CHASSIS_CAN_ACTUAL" = "$LEFT_CAN" ]; }; then
+        echo "[launch] 错误: 底盘不能与机械臂共用接口 $CHASSIS_CAN_ACTUAL"
+        exit 1
+    fi
+fi
 
 setup_can() {
     local iface="$1"
     local ctype="$2"
 
     echo "[launch] $iface 配置中 ($ctype) ..."
-    sudo ip link set "$iface" down 2>/dev/null || true
+    if ! sudo ip link set "$iface" down; then
+        echo "[launch] 错误: 无法关闭 $iface，可能仍被旧进程占用"
+        return 1
+    fi
 
     if [ "$ctype" = "arm" ]; then
         if sudo ip link set "$iface" type can bitrate 1000000 dbitrate 5000000 fd on 2>/dev/null; then
             echo "[launch]   $iface 设为 CAN FD (1M/5M)"
         else
             echo "[launch]   $iface CAN FD 不支持，降级为普通 CAN (1M)"
-            sudo ip link set "$iface" type can bitrate 1000000 2>/dev/null || true
+            sudo ip link set "$iface" type can bitrate 1000000 fd off
         fi
     else
-        sudo ip link set "$iface" type can bitrate 500000 2>/dev/null || true
+        sudo ip link set "$iface" type can bitrate 500000 fd off
     fi
 
-    sudo ip link set "$iface" up || true
+    sudo ip link set "$iface" up
+    if ! ip -o link show "$iface" | grep -q '<[^>]*UP'; then
+        echo "[launch] 错误: $iface 未进入 UP 状态"
+        return 1
+    fi
 }
 
-if $HAS_CAN0; then setup_can can0 arm;   echo "[launch] can0 就绪"; fi
-if $HAS_CAN1; then setup_can can1 arm;   echo "[launch] can1 就绪"; fi
-if $HAS_CAN2; then setup_can can2 chassis; echo "[launch] can2 就绪"; fi
+if $HAS_ARMS; then
+    setup_can "$RIGHT_CAN" arm
+    echo "[launch] 右臂 $RIGHT_CAN 就绪"
+    setup_can "$LEFT_CAN" arm
+    echo "[launch] 左臂 $LEFT_CAN 就绪"
+fi
+if $HAS_CHASSIS; then
+    setup_can "$CHASSIS_CAN_ACTUAL" chassis
+    echo "[launch] 底盘 $CHASSIS_CAN_ACTUAL 就绪"
+fi
 
 echo ""
 
@@ -156,24 +240,47 @@ echo ""
 echo "  双臂:   $(_human $HAS_ARMS)"
 echo "  底盘:   $(_human $HAS_CHASSIS)"
 echo "  升降机: $(_human $HAS_LIFT)"
+if $HAS_ARMS; then
+    echo "  右臂 CAN: $RIGHT_CAN"
+    echo "  左臂 CAN: $LEFT_CAN"
+fi
+if $HAS_CHASSIS; then
+    echo "  底盘 CAN: $CHASSIS_CAN_ACTUAL"
+fi
 echo ""
 
-# ── 生成运行时 YAML ──
-
-rm -f "$RUNTIME_YAML"
+# ── 生成运行时 YAML 和机械臂配置 ──
 
 python3 - "$UNIFIED_YAML" "$RUNTIME_YAML" \
-    "$HAS_ARMS" "$HAS_CHASSIS" "$HAS_LIFT" <<'PYEOF'
-import sys, yaml
+    "$ARM_CONFIG_SOURCE" "$RUNTIME_ARM_CONFIG" \
+    "$HAS_ARMS" "$HAS_CHASSIS" "$HAS_LIFT" \
+    "$RIGHT_CAN" "$LEFT_CAN" "$CHASSIS_CAN_ACTUAL" <<'PYEOF'
+import shlex
+import sys
+
+import yaml
 
 unified_path = sys.argv[1]
 runtime_path = sys.argv[2]
-has_arms     = sys.argv[3] == "true"
-has_chassis  = sys.argv[4] == "true"
-has_lift     = sys.argv[5] == "true"
+arm_config_source = sys.argv[3]
+arm_config_path = sys.argv[4]
+has_arms = sys.argv[5] == "true"
+has_chassis = sys.argv[6] == "true"
+has_lift = sys.argv[7] == "true"
+right_can = sys.argv[8]
+left_can = sys.argv[9]
+chassis_can = sys.argv[10]
 
 with open(unified_path, "r") as f:
     doc = yaml.safe_load(f)
+
+if has_arms:
+    with open(arm_config_source, "r") as f:
+        arm_config = yaml.safe_load(f)
+    arm_config["can_interface"]["right_arm"] = right_can
+    arm_config["can_interface"]["left_arm"] = left_can
+    with open(arm_config_path, "w") as f:
+        yaml.safe_dump(arm_config, f, default_flow_style=False, allow_unicode=True)
 
 filtered_nodes = []
 for node in doc.get("nodes", []):
@@ -182,12 +289,20 @@ for node in doc.get("nodes", []):
     if nid.startswith("arm-"):
         if not has_arms:
             continue
-        # arm-follower-* 使用 config.yaml 中的 can0/can1，已被 launch.sh 配置好
+        if nid.startswith("arm-follower-"):
+            args = shlex.split(node.get("args", ""))
+            args.extend(["--config", arm_config_path])
+            node["args"] = shlex.join(args)
         filtered_nodes.append(node)
     elif nid.startswith("chassis-"):
         if not has_chassis:
             continue
-        # chassis-controller 已通过 YAML 中的 --can-if can2 使用重命名后的接口
+        args = shlex.split(node.get("args", ""))
+        if "--can-if" in args:
+            args[args.index("--can-if") + 1] = chassis_can
+        else:
+            args.extend(["--can-if", chassis_can])
+        node["args"] = shlex.join(args)
         filtered_nodes.append(node)
     elif nid.startswith("lift-"):
         if has_lift:
@@ -203,22 +318,19 @@ with open(runtime_path, "w") as f:
 print(f"[launch] {len(filtered_nodes)} 个节点启动中 ...")
 PYEOF
 
-# ── Cleanup ──
-
-cleanup() {
-    rm -f "$RUNTIME_YAML"
-
-    if [ -n "${DORA_PID:-}" ]; then
-        kill -TERM "$DORA_PID" 2>/dev/null || true
-        wait "$DORA_PID" 2>/dev/null || true
-    fi
-    echo "[launch] 已退出"
-}
-trap cleanup EXIT INT TERM
-
 # ── Launch dora ──
 
 cd "$PROJECT_DIR"
-dora run "$RUNTIME_YAML" &
+if command -v dora &>/dev/null; then
+    DORA_CMD="$(command -v dora)"
+elif [ -x "$PROJECT_DIR/.venv/bin/dora" ]; then
+    DORA_CMD="$PROJECT_DIR/.venv/bin/dora"
+else
+    echo "[launch] 错误: 找不到 dora 命令"
+    exit 1
+fi
+
+# 不让 Dora 及其节点继承锁 FD；锁只由 launch.sh 本身持有。
+setsid "$DORA_CMD" run "$RUNTIME_YAML" 9>&- &
 DORA_PID=$!
 wait "$DORA_PID"

@@ -82,7 +82,7 @@ nodes:
 
   - id: arm-follower-right
     path: dora-openarm
-    args: "--side right"
+    args: "--side right --align-speed 0.3 --align-threshold 0.03"
     inputs:
       request_state: arm-ik/position_right
       move_position: arm-ik/position_right
@@ -92,7 +92,7 @@ nodes:
 
   - id: arm-follower-left
     path: dora-openarm
-    args: "--side left"
+    args: "--side left --align-speed 0.3 --align-threshold 0.03"
     inputs:
       request_state: arm-ik/position_left
       move_position: arm-ik/position_left
@@ -106,7 +106,7 @@ nodes:
 
   - id: chassis-controller
     path: dora-openarm-chassis-controller
-    args: "--can-if can2 --max-linear 0.05 --max-angular 25.0 --deadzone 0.05"
+    args: "--can-if can2 --max-linear 0.10 --max-angular 25.0 --deadzone 0.05"
     inputs:
       tick: dora/timer/millis/20
       left_stick_y: quest-receiver/joystick_y
